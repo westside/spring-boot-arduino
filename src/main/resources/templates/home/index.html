@@ -1,0 +1,162 @@
+<html xmlns:th="http://www.thymeleaf.org"
+  xmlns:layout="http://www.ultraq.net.nz/web/thymeleaf/layout"
+  layout:decorator="layout">
+  <head>
+    <title>Messages : View</title>
+  </head>
+  <body>
+    <h1 layout:fragment="header">Illusion DEMO</h1>
+    
+    <div layout:fragment="content"
+        class="container">
+	    <div>
+	    	<select id="port">
+	    		<option th:each="port : ${ports}" th:text="${port}"></option>
+	    	</select>
+	        <button id="connect" onclick="connect();">Connect</button>
+	        <button id="disconnect" disabled="disabled" onclick="disconnect();">Disconnect</button>
+	        
+	    </div>
+	    <div>
+	        <span>Thickness</span>
+	        <span  style="background-color: #a1a1a1">
+	        <input id="thickness" type="range"  min="0" max="100" />
+	        <input type="text" />
+	        </span>
+	    </div>
+	    <canvas id="myCanvas" width="500" height="500"  style="border:1px solid #000000;"></canvas>
+    </div>
+    
+  </body>
+</html>
+<script type="text/javascript">
+var canvas, ctx, flag = false,
+prevX = 0,
+currX = 0,
+prevY = 0,
+currY = 0,
+dot_flag = false;
+
+var x = "black";
+
+  function writeMessage(canvas, message) {
+    var context = canvas.getContext('2d');
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.font = '18pt Calibri';
+    context.fillStyle = 'black';
+    context.fillText(message, 10, 25);
+  }
+  function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
+  }
+  
+  function draw() {
+	    /* ctx.beginPath(); */
+	    ctx.moveTo(prevX, prevY);
+	    ctx.lineTo(currX, currY);
+	    ctx.strokeStyle = x;
+	    var thickness = $("#thickness").val()
+	    console.log(thickness/5)
+	    ctx.lineWidth = thickness/5;
+	    ctx.stroke();
+	    /* ctx.closePath(); */
+	}
+  
+  function findxy(res, e) {
+	    if (res == 'down') {
+	        prevX = currX;
+	        prevY = currY;
+	        currX = e.clientX - canvas.offsetLeft;
+	        currY = e.clientY - canvas.offsetTop;
+
+	        
+	        flag = true;
+	        dot_flag = true;
+	        if (dot_flag) {
+	            ctx.beginPath();
+	            ctx.fillStyle = x;
+	            ctx.fillRect(currX, currY, 2, 2);
+	            ctx.closePath();
+	            dot_flag = false;
+	        }
+	    }
+	    if (res == 'up' || res == "out") {
+	        flag = false;
+	    }
+	    if (res == 'move') {
+	        if (flag) {
+	            prevX = currX;
+	            prevY = currY;
+	            currX = e.clientX - canvas.offsetLeft;
+	            currY = e.clientY - canvas.offsetTop;
+	            sendXY(currX/canvas.width, currY/canvas.height)
+	            draw();
+	        }
+	    }
+	}
+  var canvas = document.getElementById('myCanvas');
+  var ctx = canvas.getContext('2d');
+
+  canvas.addEventListener('mousemove', function(e) {
+    var mousePos = getMousePos(canvas, e);
+    var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y;
+    writeMessage(canvas, message);
+      findxy('move', e)
+  }, false);
+  
+  canvas.addEventListener("mousedown", function (e) {
+      findxy('down', e)
+  }, false);
+  canvas.addEventListener("mouseup", function (e) {
+      findxy('up', e)
+  }, false);
+  canvas.addEventListener("mouseout", function (e) {
+      findxy('out', e)
+  }, false);
+</script>
+
+ <script src="http://cdn.sockjs.org/sockjs-0.3.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.js"></script>
+<script type="text/javascript">
+var stompClient = null;
+
+function setConnected(connected) {
+    document.getElementById('connect').disabled = connected;
+    document.getElementById('disconnect').disabled = !connected;
+}
+
+function connect() {
+    var socket = new SockJS('/webSocket');
+    stompClient = Stomp.over(socket);
+    stompClient.connect({}, function(frame) {
+        setConnected(true);
+        console.log('Connected: ' + frame);
+        stompClient.subscribe('/topic/greetings', function(greeting){
+        });
+    });
+}
+
+function disconnect() {
+    if (stompClient != null) {
+        stompClient.disconnect();
+    }
+    setConnected(false);
+    console.log("Disconnected");
+}
+
+function sendXY(x, y) {
+    stompClient.send("/app/hello", {}, $("#port").val() + "," + x + "," + y);
+}
+
+function sendDone() {
+    stompClient.send("/app/done", {}, $("#port").val());
+}
+
+sendDone()
+
+
+</script>
